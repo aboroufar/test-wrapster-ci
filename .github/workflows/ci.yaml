@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.5"
+  UV_LINK_MODE: copy
+  UV_CACHE_DIR: .uv-cache
+  UV_PYTHON_PREFERENCE: system
+  PY_COLORS: "1"
+
+jobs:
+  deps:
+    name: Generate lockfile
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python + uv
+        uses: drivendataorg/setup-python-uv-action@main
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Generate lockfile
+        run: |
+          uv lock --python ${{ env.PYTHON_VERSION }}
+
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: uv-lock
+          path: |
+            uv.lock
+            pyproject.toml
+
+  pre-commit:
+    name: Pre-commit
+    runs-on: ubuntu-latest
+    needs: deps
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download lockfile
+        uses: actions/download-artifact@v4
+        with:
+          name: uv-lock
+
+      - name: Set up Python + uv
+        uses: drivendataorg/setup-python-uv-action@main
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --frozen --all-groups
+
+      - name: Run pre-commit
+        run: |
+          uv run tox -e pre-commit
+
+  tests:
+    name: Tests ${{ matrix.os }}
+    needs:
+      - deps
+      - pre-commit
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download lockfile
+        uses: actions/download-artifact@v4
+        with:
+          name: uv-lock
+
+      - name: Set up Python + uv
+        uses: drivendataorg/setup-python-uv-action@main
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --frozen --all-groups
+
+      - name: Run tests
+        run: |
+          uv run tox -e py312
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.os }}
+          path: |
+            coverage.xml
+            report.xml
+            htmlcov/
+
+  mkdocs:
+    name: MkDocs Docker test
+    runs-on: ubuntu-latest
+    needs:
+      - deps
+      - pre-commit
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --target mkdocs \
+            -t mkdocs-server .
+
+      - name: Start container
+        run: |
+          docker run -d \
+            --name mkdocs-app \
+            -p 7000:7000 \
+            mkdocs-server
+
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            if curl -fs http://localhost:7000 > /dev/null; then
+              echo "MkDocs is running!"
+              exit 0
+            fi
+
+            echo "Waiting... ($i/30)"
+            sleep 1
+          done
+
+          docker logs mkdocs-app
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop mkdocs-app || true
+          docker rm mkdocs-app || true
+
+  # Uncomment if using SonarQube
+  sonarqube:
+     name: SonarQube
+     runs-on: ubuntu-latest
+     needs: tests
+  
+     steps:
+       - uses: actions/checkout@v5
+         with:
+           fetch-depth: 0
+  
+       - uses: SonarSource/sonarqube-scan-action@v5
+         env:
+           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  release:
+    needs:
+      - pre-commit
+      - tests
+      - mkdocs
+      # - sonarqube
+
+    permissions:
+      contents: write
+
+    uses: ./.github/workflows/_release.yaml

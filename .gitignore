@@ -1,0 +1,75 @@
+# =========================
+# Python bytecode
+# =========================
+__pycache__/
+*.py[cod]
+
+# =========================
+# Logs and data
+# =========================
+logs/
+sites/
+*.csv
+!*/.gitkeep
+input/**
+output/**
+
+# =========================
+# Local configs / secrets
+# =========================
+local_config
+.env
+.python-version
+/o365_token.txt
+
+# =========================
+# OS & editor files
+# =========================
+.DS_Store
+.idea/
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# =========================
+# Distribution / packaging
+# =========================
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+.installed.cfg
+*.egg
+MANIFEST
+
+# =========================
+# Tests & coverage
+# =========================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+cover/

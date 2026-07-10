@@ -1,0 +1,105 @@
+services:
+  redis-insight:
+    container_name: ${CONTAINER_NAME}_redisinsight
+    image: redis/redisinsight:3.2.0
+    restart: always
+    environment:
+      RI_REDIS_HOST: host.docker.internal
+      RI_REDIS_PORT: ${REDIS_PORT:-6379}
+      RI_ACCEPT_TERMS_AND_CONDITIONS: true
+    ports:
+      - ${REDISINSIGHT_PORT:-5540}:5540
+    volumes:
+      - redisinsight:/data
+    networks:
+      - transmission
+    profiles:
+      - monitoring
+
+
+  rq-dashboard:
+    container_name: ${CONTAINER_NAME}_rqdashboard
+    image: cjlapao/rq-dashboard:0.8.6
+    restart: always
+    environment:
+      RQ_DASHBOARD_REDIS_URL: "redis://host.docker.internal:${REDIS_PORT:-6379}"
+    ports:
+      - ${RQDASHBOARD_PORT:-9181}:9181
+    depends_on:
+      - redis-insight
+    networks:
+      - transmission
+    profiles:
+      - monitoring
+
+  prometheus:
+    container_name: ${CONTAINER_NAME}_prometheus
+    image: prom/prometheus:v2.53.5
+    ports:
+      - ${PROMETHEUS_PORT:-9090}:9090
+    environment:
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
+      - PUSHGATEWAY_PORT=${PUSHGATEWAY_PORT:-9091}
+    volumes:
+      - type: bind
+        source: ./prometheus/prometheus.yaml.tmpl
+        target: /etc/prometheus/prometheus.yaml.tmpl
+      - type: bind
+        source: ./prometheus/entrypoint.sh
+        target: /entrypoint.sh
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - transmission
+    profiles:
+      - monitoring
+
+  pushgateway:
+    container_name: ${CONTAINER_NAME}_pushgateway
+    image: prom/pushgateway:v1.8.0
+    ports:
+      - ${PUSHGATEWAY_PORT:-9091}:9091
+    depends_on:
+      - prometheus
+    networks:
+      - transmission
+    profiles:
+      - monitoring
+
+  grafana:
+    container_name: ${CONTAINER_NAME}_grafana
+    image: grafana/grafana:12.4
+    restart: unless-stopped
+    ports:
+      - ${GRAFANA_PORT:-3000}:3000
+    volumes:
+      - ./grafana/grafana-datasources.yaml.tmpl:/etc/grafana/provisioning/datasources/datasources.yaml.tmpl
+      - ./grafana/entrypoint.sh:/entrypoint.sh
+      - ./grafana/dashboards/dashboards.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+    environment:
+      - GF_INSTALL_PLUGINS= redis-datasource
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - transmission
+    profiles:
+      - monitoring
+
+
+secrets:
+  sky_ssh_key:
+    file: /root/.ssh/id_rsa
+
+networks:
+  transmission:
+    external: true
+    name: sfsdf_network
+
+
+volumes:
+  redisinsight:

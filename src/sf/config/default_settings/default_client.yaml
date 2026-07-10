@@ -1,0 +1,25 @@
+timeout:
+  timeout_default: 10
+  timeout_connect: 5
+  timeout_read: 5
+  timeout_write: 5
+  timeout_pool: 10
+resource_limit:
+  connection_pool_maxsize: 10
+  max_keepalive_connections: 5
+  keepalive_expiry: 5
+retry:
+  max_retries: 3
+  min_retry_time: 1
+  retry_time_multiplier: 2
+  max_retry_time: 10
+redirect:
+  max_redirects: 5
+cache:
+  enable_cache: true
+  cache_limit: 100
+  cache_ttl: 100
+api_url:
+  api_url_regex: "^https?://[^/]+/(?:api/)?([^/]+(?:/[^/]+)?)"
+prometheus:
+  enable_metrics: true

@@ -1,0 +1,80 @@
+services:
+  wrapster_project:
+    container_name: ${CONTAINER_NAME}
+    env_file:
+      - ".env"
+    build:
+      target: wrapster
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - ssh_private_key
+    image: wrapster-server
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./output:/app/output
+      - ./input:/app/input
+      - ./src:/app/src
+      - ./tests:/app/tests
+    secrets:
+      - ssh_private_key
+    ports:
+      - "${CONTAINER_PORT:-8000}:${CONTAINER_PORT:-8000}"
+    networks:
+      - transmission
+    depends_on:
+      - redis
+    profiles:
+      - default
+  mkdocs:
+    container_name: ${CONTAINER_NAME}_mkdocs
+    env_file:
+      - ".env"
+    build:
+      args:
+        - PORT=${MKDOCS_PORT:-7000}
+      context: .
+      dockerfile: Dockerfile
+      target: mkdocs
+      secrets:
+        - ssh_private_key
+    image: mkdocs-server
+    restart: always
+    ports:
+      - "${MKDOCS_PORT:-7000}:${MKDOCS_PORT:-7000}"
+    volumes:
+      - ".:/app:rw"
+    networks:
+      - transmission
+    profiles:
+      - docs
+  redis:
+    container_name: ${CONTAINER_NAME}_redis
+    image: redis:8.6.1
+    restart: always
+    ports:
+      - ${REDIS_PORT:-6379}:6379
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis-cache:/data
+    networks:
+      - transmission
+    profiles:
+      - default
+
+secrets:
+  ssh_private_key:
+    file: ~/.ssh/id_ed25519
+
+volumes:
+  redis-cache:
+    driver: local
+
+networks:
+  transmission:
+    name: ${NETWORK_NAME-:transmission_network}

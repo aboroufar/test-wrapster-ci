@@ -1,0 +1,13 @@
+defaults:
+  - /default_settings/default_client@_here_
+
+resource_limit:
+  connection_pool_maxsize: 1
+retry:
+  max_retries: 3
+  min_retry_time: 1
+  retry_time_multiplier: 2
+  max_retry_time: 10
+environment:
+  host: "https://api.weatherstack.com"
+  token_env_var: "PROD_WHETHER_ACCESS_TOKEN"

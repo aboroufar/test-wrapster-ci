@@ -1,0 +1,153 @@
+stages:
+  - deps
+  - pre-commit
+  - test
+{%- if sonarqube == "enable" %}
+  - sonarqube
+{%- endif %}
+  - release
+
+variables:
+  python_version: "{{python_version}}"
+  UV_VERSION: "0.5"
+  BASE_LAYER: bookworm
+  UV_LINK_MODE: copy
+  PY_COLORS: "1"
+  UV_CACHE_DIR: .uv-cache
+  UV_PYTHON_PREFERENCE: system
+
+# GLOBAL MAPPING: This runs before any job starts
+workflow:
+  rules:
+    - if: '$python_version == "py312"'
+      variables: { PYTHON_VERSION: "3.12" }
+    - if: '$python_version == "py313"'
+      variables: { PYTHON_VERSION: "3.13" }
+    - if: '$python_version == "py314"'
+      variables: { PYTHON_VERSION: "3.14" }
+    - when: always
+
+.dependencies:
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
+  cache:
+    key:
+      files:
+        - uv.lock
+      prefix: "uv-$PYTHON_VERSION"
+    paths:
+      - $UV_CACHE_DIR
+  before_script:
+    # Use --frozen because Stage 1 provided the lockfile
+    - uv sync --frozen --all-groups
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH'
+
+deps:
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
+  stage: deps
+  script:
+    - uv lock --python $PYTHON_VERSION
+    ##- uv sync --all-groups
+  artifacts:
+    paths:
+      - uv.lock
+      - pyproject.toml # Export this too if the script modifies it!
+    expire_in: 2h
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH'
+
+pre-commit:
+  extends: .dependencies
+  stage: pre-commit
+  needs: ["deps"]
+  script:
+    # Use uv run since tox is in your dev group now
+    - uv run tox -e pre-commit
+test:mkdocs:
+  stage: test
+  image: docker:27.3.1
+  variables:
+    DOCKER_BUILDKIT: 1
+    SSH_PRIVATE_KEY: "/root/.ssh/id_ed25519"
+  needs: ["deps", "pre-commit"]
+  script:
+    - docker info
+    - docker build
+        --target mkdocs
+        --secret id=ssh_private_key,src=$SSH_PRIVATE_KEY
+        -t mkdocs-server .
+    - docker run -d --name mkdocs-app -p 7000:7000 mkdocs-server
+    - |
+      for i in $(seq 1 30); do
+        if docker exec mkdocs-app curl -s http://localhost:7000 > /dev/null; then
+          echo "MkDocs container is UP!"
+          exit 0
+        fi
+        echo "Waiting for containerized server... ($i/30)"
+        sleep 1
+      done
+      docker logs mkdocs-app
+  after_script:
+    - docker stop mkdocs-app || true
+    - docker rm mkdocs-app || true
+  before_script:
+    - KEY_FILENAME=$(basename "{{ssh_private_key}}")
+    - SSH_KEY_PATH="/root/.ssh/$KEY_FILENAME"
+
+test:{{python_version}}:
+  extends: .dependencies
+  stage: test
+  needs: ["deps", "pre-commit"]
+  script:
+    - uv run tox -e {{python_version}}
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - report.xml
+      - coverage.xml
+      - htmlcov/
+
+{%- if sonarqube == "enable" %}
+sonarqube:
+  stage: sonarqube
+  needs: ["test:py312"]
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+    GIT_DEPTH: "0"
+    SONAR_SCANNER_OPTS: >-
+      -Dsonar.branch.name=$CI_COMMIT_BRANCH
+  cache:
+    key: sonar-$CI_PROJECT_NAME
+    paths:
+      - .sonar/cache
+  script:
+    - sonar-scanner
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH'
+  allow_failure: false  # ← Blocks release if quality gate fails
+{%- endif %}
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    # define your own rules here
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs: ["test:{{python_version}}", "test:mkdocs"]
+  script:
+    # every job requires a script block
+    - echo "Releasing ${VERSION}"
+  release:
+    tag_name: 'v0.$CI_PIPELINE_IID'                # The version is incremented per pipeline.
+    description: 'v0.$CI_PIPELINE_IID'
+    ref: $CI_COMMIT_SHA

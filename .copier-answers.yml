@@ -1,0 +1,21 @@
+# Changes here will be overwritten by Copier.
+_commit: v0.162-83-g6bc6e97
+_src_path: gitlab@git.bskyb.com:service-team/tools/wrapster-project-template.git
+author_email: s@g.com
+author_fullname: sdf
+author_username: sdf
+copyright_holder: sdf
+keywords: sdf
+license: ISC
+monitoring: enable
+package_name: sf
+project_name: sfsdf
+project_short_description: sdf
+python_version: py312
+repository_name: sfsdf
+repository_namespace: sdf
+repository_provider: github.com
+sonarqube: enable
+ssh_private_key: ~/.ssh/id_ed25519
+version: 0.1.0
+

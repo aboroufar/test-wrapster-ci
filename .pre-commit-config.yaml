@@ -1,0 +1,47 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.1
+    hooks:
+      - id: ruff-check
+        types_or: [ python, pyi ]
+        args: [ --fix ]
+      - id: ruff-format
+        types_or: [ python, pyi ]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: trailing-whitespace
+        exclude: '.svg$'
+      - id: debug-statements
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--unsafe"]
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.1
+    hooks:
+      - id: mypy
+        args: [--strict, --ignore-missing-imports, --exclude, '^tests/']
+        additional_dependencies:
+          - types-requests
+          - pytest-mypy
+          - sqlalchemy[mypy]
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.9.5
+    hooks:
+      # Update the uv lockfile
+      - id: uv-lock
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.9.0
+    hooks:
+      -   id: pip-audit
+          args:
+            - "--fix"
+          additional_dependencies:
+            - pip==26.1

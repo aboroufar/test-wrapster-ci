@@ -1,0 +1,63 @@
+name: CI
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  build:
+    name: Build for (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: ['ubuntu-latest', 'macos-latest']
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python with uv
+        uses: drivendataorg/setup-python-uv-action@main
+        with:
+          python-version: 3.12
+          cache: packages
+          cache-dependency-path: >-
+            pyproject.toml
+      - name: Install dependencies
+        run: |
+          uv lock
+          uv cache prune --ci
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files
+  test:
+    name: python unit test and coverage
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python with uv
+        uses: drivendataorg/setup-python-uv-action@main
+        with:
+          python-version: 3.12
+      - name: Run unit tests
+        run: |
+          uv run tox -e tests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: coverage.xml
+
+  release:
+    needs: [build, pre-commit, test]
+    uses: ./.github/workflows/_release.yaml
+    permissions:
+      contents: write
+

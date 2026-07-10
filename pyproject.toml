@@ -1,0 +1,152 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sfsdf"
+version = "0.1.0"
+authors = [
+    { name = "sdf", email = "s@g.com" },
+]
+keywords = ["sdf"]
+requires-python = ">=3.12,<3.15"
+readme = "README.md"
+license = {file = "LICENSE"}
+description = ""
+
+dependencies = []
+
+[dependency-groups]
+
+dev = [
+    "types-PyYAML>=6.0.12.12",
+    "pytest>=9.0.2",
+    "pytest-cov>=6.0.0",
+    "pre-commit>=4.3.0",
+    "poethepoet>=0.40.0",
+    "requests>=2.32.0",
+    "setuptools>=75.0.0",
+    "tox>=4.24.1",
+    "tox-uv>=1.25.0",
+    "fastmcp>=3.1.0",
+    "uvicorn>=0.41.0",
+    "python-dotenv>=1.1.0",
+]
+
+wrappers = [
+    "wrapster",
+    "whetherstack-client"
+
+]
+
+docs = [
+    "mkdocs==1.6.1",                                    # Current stable
+    "mkdocs-material==9.7.1",                           # 2026 Maintenance release
+    "mkdocstrings[python]==1.0.1",                      # Major v1 release (Replaces 2.0.1 confusion)
+    "mkdocs-minify-plugin==0.8.0",                      # Stable
+    "markdown-exec==1.3.0",                             # Optimized for Py 3.12+
+    "mkdocs-gen-files==0.6.0",                          # Updated Nov 2025
+    "mkdocs-literate-nav==0.6.2",                       # Current stable
+    "mkdocs-git-committers-plugin-2==2.5.0",            # Updated Jan 2025
+    "mkdocs-git-revision-date-localized-plugin==1.5.1", # Latest stable
+    "mkdocs-coverage==1.1.0",                           # Stable
+    "markdown-callouts==0.4.0",                         # Current stable
+    "mkdocs-callouts==1.10.0",                          # Optimized for Material 9.7+
+    "mkdocs-with-pdf==0.9.3",                           # PDF Generate Plugin for MkDocs
+    "mkdocs-macros-plugin==1.5.0",
+    "mkdocs-include-markdown-plugin==7.2.1",
+]
+
+[project.urls]
+Repository = "https://sdf/sdf/sfsdf"
+Issues = "https://sdf/sdf/sfsdf/issues"
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sf"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --cov=sf"
+
+[tool.uv]
+environments = [
+    "python_version == '3.12'",
+    "python_version == '3.13'",
+    "python_version == '3.14'",
+]
+package = true
+default-groups = [
+    "dev",
+    "docs",
+]
+
+[tool.uv.sources]
+wrapster = { git = "ssh://gitlab@git.bskyb.com/service-team/tools/wrapster.git", branch = "main" }
+whetherstack-client = { git = "ssh://gitlab@git.bskyb.com/service-team/wrappers/whetherstack-client.git", branch = "main" }
+
+[tool.tox]
+requires = ["tox-uv>=1.12"]
+skipsdist = true
+# envs to runs automatically with tox -p
+env_list = ["pre-commit", "py312"] # Defines default environments to run
+min_version = "4.0" # Ensures compatibility with modern Tox features
+
+[tool.tox.env_run_base]
+# This is the key fix: force tox to use uv's lockfile/source logic
+runner = "uv-venv-lock-runner"
+# Use 'editable' to ensure local source and git sources are resolved correctly
+package = "editable"
+# Use uv for environment creation and package installation
+dependency_groups = ["dev", "wrappers"] # Maps to your existing groups
+pass_env = ["*"]
+
+
+[tool.tox.env.pre-commit]
+description = "Run pre-commit hooks"
+dependency_groups = ["dev"]
+commands = [["pre-commit", "run", "--all-files", "--show-diff-on-failure"]]
+
+[tool.tox.env.py312]
+description = "Run tests with coverage"
+commands = [
+    [
+        "pytest",
+        "--junitxml=report.xml",
+        # Use the module name, NOT the path src/sf
+        "--cov",
+        "--cov-report=xml:coverage.xml",
+        "--cov-report=html:htmlcov/",
+        "{posargs}"
+    ]
+]
+
+[tool.mypy]
+# Add the src directory to the mypy path
+mypy_path = "src"
+explicit_package_bases = true
+namespace_packages = true
+
+[tool.poe.tasks.up]
+cmd = "./setup.bash up"
+help = "Build and start containers (usage: uv run poe up [profiles...])"
+
+[tool.poe.tasks.down]
+cmd = "./setup.bash down"
+help = "Destroy all containers, networks, and volumes"
+
+[tool.poe.tasks.remove]
+cmd = "./setup.bash remove"
+help = "Remove specific profiles (usage: uv run poe remove [profiles...])"
+
+[tool.poe.tasks.status]
+cmd = "./setup.bash status"
+help = "Show environment status"
+
+[tool.poe.tasks.docs]
+shell = "./setup.bash docs ${mode}"
+help = "MkDocs management (usage: uv run poe docs [mode], where mode is serve|build|stop|logs)"
+args = [
+    { name = "mode", positional = true, default = "serve", help = "MkDocs action: serve (default), build, stop, logs" }
+]
