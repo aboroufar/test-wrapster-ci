@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Python + uv
         uses: drivendataorg/setup-python-uv-action@main
@@ -34,7 +34,7 @@ jobs:
           uv lock --python ${{ env.PYTHON_VERSION }}
 
       - name: Upload lockfile
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: uv-lock
           path: |
@@ -47,10 +47,10 @@ jobs:
     needs: deps
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Download lockfile
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: uv-lock
 
@@ -84,10 +84,10 @@ jobs:
           
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Download lockfile
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: uv-lock
 
@@ -106,7 +106,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reports-${{ matrix.os }}
           path: |
@@ -122,7 +122,7 @@ jobs:
       - pre-commit
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Build Docker image
         run: |
@@ -165,11 +165,11 @@ jobs:
      needs: tests
   
      steps:
-       - uses: actions/checkout@v5
+       - uses: actions/checkout@v7
          with:
            fetch-depth: 0
   
-       - uses: SonarSource/sonarqube-scan-action@v5
+       - uses: SonarSource/sonarqube-scan-action@v8
          env:
            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   release:
